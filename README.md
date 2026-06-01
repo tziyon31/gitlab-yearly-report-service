@@ -12,7 +12,7 @@ updates, or deletes anything in GitLab.
 
 > ### 📌 Don't miss the deep dive
 > The most interesting part of this assignment was the **instance-wide `scope=all`**
-> edge case. **→ [Press here to jump to the Design note](#design-note-the-instance-wide-scopeall-edge-case)**
+> edge case. **→ [Press here to jump to the Note](#deep-dive)**
 
 ---
 
@@ -193,6 +193,8 @@ There is also a `smoke_test.sh` that exercises a running instance over HTTP, inc
 the 400 and 404 cases.
 
 ---
+
+<a id="deep-dive"></a>
 
 ## Note: the instance-wide (`scope=all`) edge case
 
