@@ -5,6 +5,22 @@ MIN_YEAR = 1970
 MAX_YEAR = 2100
 
 
+def parse_year_query(year: str | None) -> int:
+    if year is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Missing required query parameter: year",
+        )
+
+    if not year.isdigit() or len(year) != 4:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid year format. Expected a 4-digit year, for example 2025",
+        )
+
+    return validate_year(int(year))
+
+
 def validate_year(year: int) -> int:
     if year < MIN_YEAR or year > MAX_YEAR:
         raise HTTPException(
