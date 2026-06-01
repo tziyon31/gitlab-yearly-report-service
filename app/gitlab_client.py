@@ -1,6 +1,7 @@
 from urllib.parse import quote
 
 import httpx
+from fastapi import HTTPException
 
 from app.errors import raise_for_gitlab_connection_error, raise_for_gitlab_error
 from app.settings import Settings
@@ -50,3 +51,41 @@ def get_from_gitlab(
     raise_for_gitlab_error(response)
 
     return response
+
+
+def get_paginated_from_gitlab(
+    settings: Settings,
+    path: str,
+    params: dict | None = None,
+) -> list[dict]:
+    all_items: list[dict] = []
+    page = 1
+
+    while True:
+        request_params = dict(params or {})
+        request_params["page"] = page
+
+        response = get_from_gitlab(
+            settings=settings,
+            path=path,
+            params=request_params,
+        )
+
+        page_items = response.json()
+
+        if not isinstance(page_items, list):
+            raise HTTPException(
+                status_code=502,
+                detail="Unexpected GitLab response format",
+            )
+
+        all_items.extend(page_items)
+
+        next_page = response.headers.get("X-Next-Page")
+
+        if not next_page:
+            break
+
+        page = int(next_page)
+
+    return all_items
