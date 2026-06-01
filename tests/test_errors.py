@@ -90,3 +90,13 @@ def test_raise_for_gitlab_connection_error_maps_to_502():
 
     assert exc_info.value.status_code == 502
     assert exc_info.value.detail == "Failed to connect to GitLab"
+
+
+def test_raise_for_gitlab_connection_error_maps_timeout_to_504():
+    original_error = httpx.ReadTimeout("The read operation timed out")
+
+    with pytest.raises(HTTPException) as exc_info:
+        raise_for_gitlab_connection_error(original_error)
+
+    assert exc_info.value.status_code == 504
+    assert exc_info.value.detail == "GitLab request timed out"

@@ -43,6 +43,12 @@ def raise_for_gitlab_error(response: httpx.Response) -> None:
 
 
 def raise_for_gitlab_connection_error(error: httpx.RequestError) -> None:
+    if isinstance(error, httpx.TimeoutException):
+        raise HTTPException(
+            status_code=504,
+            detail="GitLab request timed out",
+        ) from error
+
     raise HTTPException(
         status_code=502,
         detail="Failed to connect to GitLab",

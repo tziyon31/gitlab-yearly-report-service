@@ -8,7 +8,7 @@ from app.settings import Settings
 
 
 API_PREFIX = "/api/v4"
-TIMEOUT_SECONDS = 10.0
+TIMEOUT_SECONDS = 30.0
 
 
 def build_api_url(settings: Settings, path: str) -> str:
