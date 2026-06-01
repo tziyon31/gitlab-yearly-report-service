@@ -58,6 +58,14 @@ def test_raise_for_gitlab_error_maps_404():
     )
 
 
+def test_raise_for_gitlab_error_maps_408_to_504():
+    assert_gitlab_error(
+        gitlab_status_code=408,
+        expected_status_code=504,
+        expected_detail="GitLab request timed out",
+    )
+
+
 def test_raise_for_gitlab_error_maps_429():
     assert_gitlab_error(
         gitlab_status_code=429,

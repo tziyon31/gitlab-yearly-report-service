@@ -1,3 +1,4 @@
+import os
 from urllib.parse import quote
 
 import httpx
@@ -8,7 +9,18 @@ from app.settings import Settings
 
 
 API_PREFIX = "/api/v4"
-TIMEOUT_SECONDS = 30.0
+
+# Read timeout is configurable at runtime so it can be tuned without rebuilding
+# the image (e.g. -e REQUEST_TIMEOUT_SECONDS=60). Connect stays short on purpose.
+CONNECT_TIMEOUT_SECONDS = 5.0
+REQUEST_TIMEOUT_SECONDS = float(os.environ.get("REQUEST_TIMEOUT_SECONDS", "30"))
+
+GITLAB_TIMEOUT = httpx.Timeout(
+    connect=CONNECT_TIMEOUT_SECONDS,
+    read=REQUEST_TIMEOUT_SECONDS,
+    write=REQUEST_TIMEOUT_SECONDS,
+    pool=REQUEST_TIMEOUT_SECONDS,
+)
 
 
 def build_api_url(settings: Settings, path: str) -> str:
@@ -43,7 +55,7 @@ def get_from_gitlab(
             url,
             headers=build_auth_headers(settings),
             params=params,
-            timeout=TIMEOUT_SECONDS,
+            timeout=GITLAB_TIMEOUT,
         )
     except httpx.RequestError as error:
         raise_for_gitlab_connection_error(error)

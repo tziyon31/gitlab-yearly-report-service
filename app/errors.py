@@ -24,6 +24,12 @@ def raise_for_gitlab_error(response: httpx.Response) -> None:
             detail="GitLab project or resource not found",
         )
 
+    if response.status_code == 408:
+        raise HTTPException(
+            status_code=504,
+            detail="GitLab request timed out",
+        )
+
     if response.status_code == 429:
         raise HTTPException(
             status_code=429,
