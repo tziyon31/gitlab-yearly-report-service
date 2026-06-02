@@ -1,13 +1,15 @@
 """MCP server exposing GitLab yearly report tools."""
 
+from collections.abc import Callable
 from typing import Any
 
 from fastapi import HTTPException
 from mcp.server.fastmcp import FastMCP
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
-from app.settings import get_settings
-from gitlab_mcp.handlers import handle_get_issues_by_year, handle_get_merge_requests_by_year
+from app.reports import build_issues_report, build_merge_requests_report
+from app.schemas import IssuesReport, MergeRequestsReport
+from app.settings import Settings, get_settings
 from gitlab_mcp.schemas import GetIssuesByYearInput, GetMergeRequestsByYearInput
 
 mcp = FastMCP(
@@ -19,10 +21,20 @@ mcp = FastMCP(
 )
 
 
-def _report_to_dict(handler, tool_input) -> dict[str, Any]:
+settings: Settings = get_settings()
+
+
+def _run_report_tool(
+    build_report: Callable[..., IssuesReport | MergeRequestsReport],
+    tool_input: BaseModel,
+) -> dict[str, Any]:
+    """Build a report via app.reports and return JSON-serializable dict for MCP."""
     try:
-        settings = get_settings()
-        report = handler(settings, tool_input)
+        report = build_report(
+            settings=settings,
+            year=tool_input.year,
+            project_id_or_path=tool_input.project_id_or_path,
+        )
         return report.model_dump(mode="json")
     except ValidationError as error:
         raise ValueError(str(error)) from error
@@ -45,7 +57,7 @@ def get_issues_by_year(
         year=year,
         project_id_or_path=project_id_or_path,
     )
-    return _report_to_dict(handle_get_issues_by_year, tool_input)
+    return _run_report_tool(build_issues_report, tool_input)
 
 
 @mcp.tool(
@@ -63,7 +75,7 @@ def get_merge_requests_by_year(
         year=year,
         project_id_or_path=project_id_or_path,
     )
-    return _report_to_dict(handle_get_merge_requests_by_year, tool_input)
+    return _run_report_tool(build_merge_requests_report, tool_input)
 
 
 def main() -> None:

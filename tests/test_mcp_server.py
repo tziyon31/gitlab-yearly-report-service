@@ -20,9 +20,10 @@ def test_mcp_server_registers_required_tools():
 
 
 def test_get_issues_by_year_tool_returns_report_json(monkeypatch):
-    def fake_handle(settings, tool_input):
-        assert tool_input.year == 2025
-        assert tool_input.project_id_or_path == "my-group/my-project"
+    def fake_build_issues_report(*, settings, year, project_id_or_path):
+        assert settings is mcp_server_module.settings
+        assert year == 2025
+        assert project_id_or_path == "my-group/my-project"
         return IssuesReport(
             year=2025,
             project="my-group/my-project",
@@ -30,7 +31,7 @@ def test_get_issues_by_year_tool_returns_report_json(monkeypatch):
             items=[],
         )
 
-    monkeypatch.setattr(mcp_server_module, "handle_get_issues_by_year", fake_handle)
+    monkeypatch.setattr(mcp_server_module, "build_issues_report", fake_build_issues_report)
 
     content, structured = asyncio.run(
         mcp_server_module.mcp.call_tool(

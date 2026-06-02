@@ -5,6 +5,17 @@ MIN_YEAR = 1970
 MAX_YEAR = 2100
 
 
+def validate_year_value(year: int) -> int:
+    """Validate a calendar year (shared by HTTP and MCP).
+
+    Raises ValueError so callers can map to HTTPException or Pydantic errors.
+    """
+    if year < MIN_YEAR or year > MAX_YEAR:
+        raise ValueError(f"year must be between {MIN_YEAR} and {MAX_YEAR}")
+
+    return year
+
+
 def parse_year_query(year: str | None) -> int:
     if year is None:
         raise HTTPException(
@@ -22,13 +33,10 @@ def parse_year_query(year: str | None) -> int:
 
 
 def validate_year(year: int) -> int:
-    if year < MIN_YEAR or year > MAX_YEAR:
-        raise HTTPException(
-            status_code=400,
-            detail=f"year must be between {MIN_YEAR} and {MAX_YEAR}",
-        )
-
-    return year
+    try:
+        return validate_year_value(year)
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail=str(error)) from error
 
 
 def build_year_filter_params(year: int) -> dict[str, str | int]:
