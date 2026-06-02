@@ -25,7 +25,7 @@ updates, or deletes anything in GitLab.
 - Precise error mapping (401 / 403 / 404 / 504 / 502) instead of leaking raw upstream errors.
 - Configuration only through environment variables; **no secrets baked into the image**.
 - Multi-stage, non-root Dockerfile.
-- Unit/integration test suite (`pytest`).
+- Automated `pytest` suite with unit and endpoint-level tests.
 
 ---
 
@@ -116,18 +116,18 @@ uvicorn app.main:app --port 8080
 | `GET /issues?year=2025`                         | Issues from the whole instance (token-scoped)      |
 | `GET /issues?year=2025&project=<id-or-path>`    | Issues from a specific project                     |
 | `GET /merge-requests?year=2025`                 | Merge requests from the whole instance             |
-| `GET /merge-requests?year=2025&project=<id>`    | Merge requests from a specific project             |
+| `GET /merge-requests?year=2025&project=<id-or-path>` | Merge requests from a specific project        |
 
 `project` accepts either a numeric ID (`77374431`) or a URL-encoded path
 (`my-group%2Fmy-project`).
 
-### Example response
+### Example issues response
 
 ```json
 {
   "year": 2025,
   "project": "tziyon31/Ted-Search",
-  "count": 2,
+  "count": 1,
   "items": [
     {
       "id": 10,
@@ -137,6 +137,29 @@ uvicorn app.main:app --port 8080
       "state": "opened",
       "created_at": "2025-01-10T12:00:00Z",
       "web_url": "https://gitlab.com/.../issues/3"
+    }
+  ]
+}
+```
+
+### Example merge requests response
+
+```json
+{
+  "year": 2025,
+  "project": "tziyon31/Ted-Search",
+  "count": 1,
+  "items": [
+    {
+      "id": 20,
+      "iid": 5,
+      "project_id": 99,
+      "title": "Add auth",
+      "state": "merged",
+      "created_at": "2025-02-10T12:00:00Z",
+      "source_branch": "feature/auth",
+      "target_branch": "main",
+      "web_url": "https://gitlab.com/.../merge_requests/5"
     }
   ]
 }
@@ -169,7 +192,7 @@ curl -s "http://localhost:8080/merge-requests?year=2025"
 | GitLab authentication failed  | `401`                | `GitLab authentication failed`         |
 | GitLab permission denied      | `403`                | `GitLab permission denied`             |
 | GitLab project not found      | `404`                | `GitLab project or resource not found` |
-| GitLab request timed out (408)| `504`                | `GitLab request timed out`             |
+| GitLab timeout / upstream 408 | `504`                | `GitLab request timed out`             |
 | GitLab rate limit (429)       | `429`                | `GitLab rate limit exceeded`           |
 | GitLab 5xx / unreachable      | `502`                | `GitLab service error` / `Failed to connect to GitLab` |
 
@@ -185,12 +208,13 @@ source .venv/bin/activate
 pytest -q
 ```
 
-Coverage includes: `/health`, year validation (400 not 422), URL building and project
-encoding, pagination across pages, GitLab error mapping (401/403/404/408/429/5xx),
-and the `/issues` & `/merge-requests` endpoints end-to-end (GitLab calls stubbed).
+Automated pytest suite with unit and endpoint-level tests. Coverage includes:
+`/health`, year validation (400 not 422), URL building and project encoding,
+pagination across pages, GitLab error mapping (401/403/404/408/429/5xx), and the
+`/issues` & `/merge-requests` endpoints (GitLab calls stubbed).
 
-There is also a `smoke_test.sh` that exercises a running instance over HTTP, including
-the 400 and 404 cases.
+A smoke test script (`smoke_test.sh`) is included for testing against a running
+service and a real GitLab token, including the 400 and 404 cases.
 
 ---
 
