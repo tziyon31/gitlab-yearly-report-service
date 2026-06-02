@@ -1,5 +1,6 @@
 import os
 from dataclasses import dataclass
+from functools import lru_cache
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ def _env_flag(name: str, default: bool = False) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
+@lru_cache
 def get_settings() -> Settings:
     gitlab_url = os.environ.get("GITLAB_URL")
     gitlab_token = os.environ.get("GITLAB_TOKEN")

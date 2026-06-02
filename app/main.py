@@ -1,12 +1,12 @@
 import json
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import FastAPI, Query
+from fastapi import Depends, FastAPI, Query
 from fastapi.responses import JSONResponse
 
 from app.reports import build_issues_report, build_merge_requests_report
 from app.schemas import IssuesReport, MergeRequestsReport
-from app.settings import get_settings
+from app.settings import Settings, get_settings
 from app.year_filters import parse_year_query
 
 
@@ -17,14 +17,14 @@ class PrettyJSONResponse(JSONResponse):
         return json.dumps(content, indent=2, ensure_ascii=False).encode("utf-8")
 
 
-# Validate required environment variables when the application starts.
-settings = get_settings()
-
 app = FastAPI(
     title="GitLab Yearly Report Service",
     version="0.1.0",
     default_response_class=PrettyJSONResponse,
 )
+
+# Fail fast when the app module is loaded (missing GITLAB_URL / GITLAB_TOKEN).
+get_settings()
 
 
 @app.get("/health")
@@ -34,6 +34,7 @@ def health() -> dict[str, str]:
 
 @app.get("/issues", response_model=IssuesReport)
 def issues(
+    settings: Annotated[Settings, Depends(get_settings)],
     year: str | None = Query(default=None),
     project: str | None = Query(default=None),
 ) -> IssuesReport:
@@ -48,6 +49,7 @@ def issues(
 
 @app.get("/merge-requests", response_model=MergeRequestsReport)
 def merge_requests(
+    settings: Annotated[Settings, Depends(get_settings)],
     year: str | None = Query(default=None),
     project: str | None = Query(default=None),
 ) -> MergeRequestsReport:

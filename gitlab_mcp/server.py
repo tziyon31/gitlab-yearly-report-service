@@ -27,11 +27,13 @@ settings: Settings = get_settings()
 def _run_report_tool(
     build_report: Callable[..., IssuesReport | MergeRequestsReport],
     tool_input: BaseModel,
+    *,
+    app_settings: Settings,
 ) -> dict[str, Any]:
     """Build a report via app.reports and return JSON-serializable dict for MCP."""
     try:
         report = build_report(
-            settings=settings,
+            settings=app_settings,
             year=tool_input.year,
             project_id_or_path=tool_input.project_id_or_path,
         )
@@ -57,7 +59,7 @@ def get_issues_by_year(
         year=year,
         project_id_or_path=project_id_or_path,
     )
-    return _run_report_tool(build_issues_report, tool_input)
+    return _run_report_tool(build_issues_report, tool_input, app_settings=settings)
 
 
 @mcp.tool(
@@ -75,7 +77,7 @@ def get_merge_requests_by_year(
         year=year,
         project_id_or_path=project_id_or_path,
     )
-    return _run_report_tool(build_merge_requests_report, tool_input)
+    return _run_report_tool(build_merge_requests_report, tool_input, app_settings=settings)
 
 
 def main() -> None:
