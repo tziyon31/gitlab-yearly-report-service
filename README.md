@@ -43,7 +43,8 @@ app/
 └── errors.py        # GitLab status code -> HTTP error mapping
 tests/               # pytest suite
 Dockerfile
-requirements.txt
+requirements.txt      # runtime dependencies
+requirements-dev.txt  # runtime + pytest (not shipped in the image)
 ```
 
 The layering is deliberate: `gitlab_client.py` only knows *how to talk to GitLab*,
@@ -216,8 +217,12 @@ raw GitLab error bodies to the caller.
 
 ```bash
 source .venv/bin/activate
+pip install -r requirements-dev.txt
 pytest -q
 ```
+
+`pytest` is a development-only dependency (in `requirements-dev.txt`), so it is **not**
+installed into the runtime Docker image.
 
 Automated pytest suite with unit and endpoint-level tests. Coverage includes:
 `/health`, year validation (400 not 422), URL building and project encoding,
@@ -226,6 +231,27 @@ pagination across pages, GitLab error mapping (401/403/404/408/429/5xx), and the
 
 A smoke test script (`smoke_test.sh`) is included for testing against a running
 service and a real GitLab token, including the 400 and 404 cases.
+
+## Verification (local GitLab instance, no jq)
+
+With the service running on `http://localhost:8080`:
+
+```bash
+# 1) Health
+curl -i "http://localhost:8080/health"
+
+# 2) Issues, instance-wide
+curl -i "http://localhost:8080/issues?year=2026"
+
+# 3) Issues, project-scoped
+curl -i "http://localhost:8080/issues?year=2026&project=root%2F1"
+
+# 4) Merge requests, instance-wide
+curl -i "http://localhost:8080/merge-requests?year=2026"
+
+# 5) Validation error (missing year -> 400)
+curl -i "http://localhost:8080/issues"
+```
 
 ---
 
