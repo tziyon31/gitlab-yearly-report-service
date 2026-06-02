@@ -248,6 +248,27 @@ The optional MCP server exposes the same reporting logic as **MCP tools** (for C
 Claude Desktop, or any MCP client). The HTTP service (`app/`) and MCP layer
 (`gitlab_mcp/`) share `app/reports.py` — no duplicated business logic.
 
+The MCP process does **not** call `http://localhost:8080` and does **not** require the
+Docker container to be running. Both entry points use the same report builders and talk
+to GitLab directly with `GITLAB_URL` and `GITLAB_TOKEN`.
+
+```mermaid
+flowchart LR
+  subgraph docker["Docker container"]
+    Uvicorn["uvicorn :8080"]
+    Main["app/main.py"]
+  end
+  subgraph mcp_path["MCP (local / Cursor)"]
+    Cursor["Cursor / MCP client"]
+    MCPSrv["python -m gitlab_mcp.server"]
+    Handlers["gitlab_mcp/handlers.py"]
+  end
+  Reports["app/reports.py"]
+  GitLab["GitLab API"]
+  Uvicorn --> Main --> Reports --> GitLab
+  Cursor <-->|stdio| MCPSrv --> Handlers --> Reports --> GitLab
+```
+
 The folder is named `gitlab_mcp` (not `mcp`) because a local package called `mcp` would
 shadow the official [`mcp`](https://pypi.org/project/mcp/) PyPI library.
 
