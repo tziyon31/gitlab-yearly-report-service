@@ -180,6 +180,17 @@ curl -s "http://localhost:8080/issues?year=2025"
 curl -s "http://localhost:8080/merge-requests?year=2025"
 ```
 
+The API returns standard (compact) JSON. For readable output, pipe it through `jq`:
+
+```bash
+# Pretty-print the full report
+curl -s "http://localhost:8080/issues?year=2025&project=77374431" | jq
+
+# Compact one line per item: iid, state, title
+curl -s "http://localhost:8080/merge-requests?year=2025&project=77374431" \
+  | jq -r '.items[] | "\(.iid)\t\(.state)\t\(.title)"'
+```
+
 ---
 
 ## Error handling

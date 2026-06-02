@@ -1,4 +1,8 @@
+import json
+from typing import Any
+
 from fastapi import FastAPI, Query
+from fastapi.responses import JSONResponse
 
 from app.mappers import map_issue, map_merge_request
 from app.reports import get_issues_by_year, get_merge_requests_by_year
@@ -7,12 +11,20 @@ from app.settings import get_settings
 from app.year_filters import parse_year_query
 
 
+class PrettyJSONResponse(JSONResponse):
+    """Return human-readable, indented JSON so reports are easy to read."""
+
+    def render(self, content: Any) -> bytes:
+        return json.dumps(content, indent=2, ensure_ascii=False).encode("utf-8")
+
+
 # Validate required environment variables when the application starts.
 settings = get_settings()
 
 app = FastAPI(
     title="GitLab Yearly Report Service",
     version="0.1.0",
+    default_response_class=PrettyJSONResponse,
 )
 
 
