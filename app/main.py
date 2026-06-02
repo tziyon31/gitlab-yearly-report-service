@@ -4,8 +4,7 @@ from typing import Any
 from fastapi import FastAPI, Query
 from fastapi.responses import JSONResponse
 
-from app.mappers import map_issue, map_merge_request
-from app.reports import get_issues_by_year, get_merge_requests_by_year
+from app.reports import build_issues_report, build_merge_requests_report
 from app.schemas import IssuesReport, MergeRequestsReport
 from app.settings import get_settings
 from app.year_filters import parse_year_query
@@ -40,19 +39,10 @@ def issues(
 ) -> IssuesReport:
     parsed_year = parse_year_query(year)
 
-    raw_issues = get_issues_by_year(
+    return build_issues_report(
         settings=settings,
         year=parsed_year,
         project_id_or_path=project,
-    )
-
-    items = [map_issue(raw_issue) for raw_issue in raw_issues]
-
-    return IssuesReport(
-        year=parsed_year,
-        project=project,
-        count=len(items),
-        items=items,
     )
 
 
@@ -63,20 +53,8 @@ def merge_requests(
 ) -> MergeRequestsReport:
     parsed_year = parse_year_query(year)
 
-    raw_merge_requests = get_merge_requests_by_year(
+    return build_merge_requests_report(
         settings=settings,
         year=parsed_year,
         project_id_or_path=project,
-    )
-
-    items = [
-        map_merge_request(raw_merge_request)
-        for raw_merge_request in raw_merge_requests
-    ]
-
-    return MergeRequestsReport(
-        year=parsed_year,
-        project=project,
-        count=len(items),
-        items=items,
     )

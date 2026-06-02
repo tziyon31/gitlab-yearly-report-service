@@ -10,9 +10,10 @@ Each report can be scoped to a **single project** or to the **whole GitLab insta
 (bounded by the permissions of the provided token). The service never creates,
 updates, or deletes anything in GitLab.
 
-> ### 📌 Don't miss the deep dive
-> The most interesting part of this assignment was the **instance-wide `scope=all`**
-> edge case. **→ [Press here to jump to the Note](#deep-dive)**
+> ### Instance-wide reporting
+> GitLab global queries with `scope=all` behave very differently on a small
+> self-hosted instance than on a large SaaS deployment.
+> **→ [Design note](#deep-dive)**
 
 ---
 
@@ -26,6 +27,7 @@ updates, or deletes anything in GitLab.
 - Configuration only through environment variables; **no secrets baked into the image**.
 - Multi-stage, non-root Dockerfile.
 - Automated `pytest` suite with unit and endpoint-level tests.
+- Optional **MCP server** with tools `get_issues_by_year` and `get_merge_requests_by_year` (same logic as HTTP).
 
 ---
 
@@ -36,21 +38,24 @@ app/
 ├── main.py          # FastAPI app + endpoints (HTTP layer)
 ├── settings.py      # Reads/validates GITLAB_URL and GITLAB_TOKEN from the env
 ├── gitlab_client.py # Low-level GitLab HTTP: URL building, auth header, timeout, pagination
-├── reports.py       # Assignment-level functions: get_issues_by_year / get_merge_requests_by_year
+├── reports.py       # Report assembly: fetch from GitLab + map to response schemas
 ├── year_filters.py  # Year parsing/validation + GitLab date-range params
 ├── mappers.py       # Raw GitLab JSON -> response schemas
 ├── schemas.py       # Pydantic response models (the API contract)
 └── errors.py        # GitLab status code -> HTTP error mapping
+gitlab_mcp/          # MCP tools (dev dependency; not in the HTTP Docker image)
+├── server.py        # FastMCP tools entrypoint
+├── handlers.py      # Thin adapter -> app.reports
+└── schemas.py       # MCP tool input models
 tests/               # pytest suite
 Dockerfile
 requirements.txt      # runtime dependencies
-requirements-dev.txt  # runtime + pytest (not shipped in the image)
+requirements-dev.txt  # runtime + mcp + pytest (not shipped in the image)
 ```
 
 The layering is deliberate: `gitlab_client.py` only knows *how to talk to GitLab*,
-`reports.py` knows *what the assignment asks for*, and `main.py` only does HTTP.
-This keeps each piece small and easy to review (and lets a future MCP server reuse
-`reports.py` directly).
+`reports.py` owns report assembly (fetch + mapping), and `main.py` only does HTTP.
+The MCP layer reuses `reports.py` so business logic stays in one place.
 
 ---
 
@@ -236,6 +241,80 @@ pagination across pages, GitLab error mapping (401/403/404/408/429/5xx), and the
 A smoke test script (`smoke_test.sh`) is included for testing against a running
 service and a real GitLab token, including the 400 and 404 cases.
 
+---
+
+## MCP server
+
+The optional MCP server exposes the same reporting logic as **MCP tools** (for Cursor,
+Claude Desktop, or any MCP client). The HTTP service (`app/`) and MCP layer
+(`gitlab_mcp/`) share `app/reports.py` — no duplicated business logic.
+
+The folder is named `gitlab_mcp` (not `mcp`) because a local package called `mcp` would
+shadow the official [`mcp`](https://pypi.org/project/mcp/) PyPI library.
+
+### Tools
+
+| Tool | Parameters | Description |
+| ---- | ---------- | ----------- |
+| `get_issues_by_year` | `year` (required), `project_id_or_path` (optional) | Yearly issues report (JSON) |
+| `get_merge_requests_by_year` | `year` (required), `project_id_or_path` (optional) | Yearly merge requests report (JSON) |
+
+Omit `project_id_or_path` for instance-wide scope (same semantics as the HTTP API).
+
+### Install and run
+
+MCP dependencies are in `requirements-dev.txt` only (not in the production Docker image).
+
+```bash
+cd gitlab-yearly-report-service
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements-dev.txt
+
+export GITLAB_URL="http://gitlab.example.com:8929"   # or https://gitlab.com
+export GITLAB_TOKEN="your-read-token"
+# optional:
+# export ENABLE_MEMBERSHIP_FALLBACK=true
+
+python -m gitlab_mcp.server
+```
+
+The process speaks **stdio** (standard MCP transport). Leave it running; the client
+(Cursor) connects to it.
+
+### Cursor configuration
+
+Add to your Cursor MCP settings (`.cursor/mcp.json` in the project or global MCP config).
+Use the **absolute path** to this repo and to the venv Python:
+
+```json
+{
+  "mcpServers": {
+    "gitlab-yearly-report": {
+      "command": "/absolute/path/to/gitlab-yearly-report-service/.venv/bin/python",
+      "args": ["-m", "gitlab_mcp.server"],
+      "cwd": "/absolute/path/to/gitlab-yearly-report-service",
+      "env": {
+        "GITLAB_URL": "http://gitlab.example.com:8929",
+        "GITLAB_TOKEN": "your-read-token"
+      }
+    }
+  }
+}
+```
+
+Restart Cursor (or reload MCP servers), then ask the agent to call e.g.
+`get_issues_by_year` with `year: 2026`. The response is the same JSON shape as
+`GET /issues?year=2026`.
+
+### Fallback behavior (instance-wide)
+
+Same as the HTTP API: by default, global `scope=all` failures return `502`/`504` with a
+message explaining how to enable fallback. Set `ENABLE_MEMBERSHIP_FALLBACK=true` to
+enumerate `membership=true` projects instead.
+
+---
+
 ## Verification (local GitLab instance, no jq)
 
 With the service running on `http://localhost:8080`:
@@ -263,10 +342,10 @@ curl -i "http://localhost:8080/issues"
 
 ## Note: the instance-wide (`scope=all`) edge case
 
-The project-scoped endpoints are straightforward and reliable. The interesting part of
-this assignment is the **instance-wide** report ("the entire GitLab instance, according
-to the permissions of the provided token"). I investigated it carefully, and this
-section documents what I found and the reasoning behind the final design.
+The project-scoped endpoints are straightforward and reliable. The subtle part is the
+**instance-wide** report (everything visible to the token across the GitLab instance).
+This section documents what was observed on real instances and the reasoning behind
+the final design.
 
 ### The requirement and the first approach
 
@@ -322,8 +401,8 @@ in a single response anyway).
 
 `scope=all` is the correct, literal interpretation of "the entire instance according to
 the token's permissions", and it works exactly as intended against an
-**appropriately sized instance** — which is precisely the **local GitLab playground**
-the assignment suggests. On a giant public SaaS instance like GitLab.com the global
+**appropriately sized instance** — for example the **local GitLab playground** below.
+On a giant public SaaS instance like GitLab.com the global
 endpoint is impractical (GitLab itself times out), so this service is intended to be
 validated instance-wide against a dedicated/self-hosted instance, while project-scoped
 reports work everywhere including GitLab.com.
@@ -362,4 +441,3 @@ sudo docker run --detach \
 
 After GitLab starts, create groups, projects, issues, and merge requests, create a
 read-scoped token, and point the service at it via `GITLAB_URL` / `GITLAB_TOKEN`.
-```

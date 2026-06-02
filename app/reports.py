@@ -4,6 +4,8 @@ from fastapi import HTTPException
 
 from app.fallback_enumeration import fetch_by_membership_enumeration
 from app.gitlab_client import encode_project_id_or_path, get_paginated_from_gitlab
+from app.mappers import map_issue, map_merge_request
+from app.schemas import IssuesReport, MergeRequestsReport
 from app.settings import Settings
 from app.year_filters import build_year_filter_params
 
@@ -97,3 +99,45 @@ def get_merge_requests_by_year(
                 params=params,
             )
         raise
+
+
+def build_issues_report(
+    settings: Settings,
+    year: int,
+    project_id_or_path: str | None = None,
+) -> IssuesReport:
+    raw_issues = get_issues_by_year(
+        settings=settings,
+        year=year,
+        project_id_or_path=project_id_or_path,
+    )
+
+    items = [map_issue(raw_issue) for raw_issue in raw_issues]
+
+    return IssuesReport(
+        year=year,
+        project=project_id_or_path,
+        count=len(items),
+        items=items,
+    )
+
+
+def build_merge_requests_report(
+    settings: Settings,
+    year: int,
+    project_id_or_path: str | None = None,
+) -> MergeRequestsReport:
+    raw_merge_requests = get_merge_requests_by_year(
+        settings=settings,
+        year=year,
+        project_id_or_path=project_id_or_path,
+    )
+
+    items = [map_merge_request(raw_mr) for raw_mr in raw_merge_requests]
+
+    return MergeRequestsReport(
+        year=year,
+        project=project_id_or_path,
+        count=len(items),
+        items=items,
+    )
