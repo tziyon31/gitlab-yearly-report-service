@@ -1,6 +1,24 @@
+import logging
+
+from fastapi import HTTPException
+
+from app.fallback_enumeration import fetch_by_membership_enumeration
 from app.gitlab_client import encode_project_id_or_path, get_paginated_from_gitlab
 from app.settings import Settings
 from app.year_filters import build_year_filter_params
+
+logger = logging.getLogger(__name__)
+
+
+def _raise_global_scope_failure_with_fallback_hint(error: HTTPException) -> None:
+    raise HTTPException(
+        status_code=error.status_code,
+        detail=(
+            f"{error.detail}. Global scope query failed before fallback. "
+            "To enable fallback enumeration over membership=true projects, "
+            "set ENABLE_MEMBERSHIP_FALLBACK=true."
+        ),
+    ) from error
 
 
 def get_issues_by_year(
@@ -13,14 +31,33 @@ def get_issues_by_year(
     if project_id_or_path:
         encoded_project = encode_project_id_or_path(project_id_or_path)
         path = f"/projects/{encoded_project}/issues"
-    else:
-        path = "/issues"
+        return get_paginated_from_gitlab(
+            settings=settings,
+            path=path,
+            params=params,
+        )
 
-    return get_paginated_from_gitlab(
-        settings=settings,
-        path=path,
-        params=params,
-    )
+    try:
+        return get_paginated_from_gitlab(
+            settings=settings,
+            path="/issues",
+            params=params,
+        )
+    except HTTPException as error:
+        if error.status_code in {502, 504}:
+            if not settings.enable_membership_fallback:
+                _raise_global_scope_failure_with_fallback_hint(error)
+            logger.warning(
+                "Global /issues query failed with %s. "
+                "Falling back to membership=true project enumeration.",
+                error.status_code,
+            )
+            return fetch_by_membership_enumeration(
+                settings=settings,
+                resource="issues",
+                params=params,
+            )
+        raise
 
 
 def get_merge_requests_by_year(
@@ -33,11 +70,30 @@ def get_merge_requests_by_year(
     if project_id_or_path:
         encoded_project = encode_project_id_or_path(project_id_or_path)
         path = f"/projects/{encoded_project}/merge_requests"
-    else:
-        path = "/merge_requests"
+        return get_paginated_from_gitlab(
+            settings=settings,
+            path=path,
+            params=params,
+        )
 
-    return get_paginated_from_gitlab(
-        settings=settings,
-        path=path,
-        params=params,
-    )
+    try:
+        return get_paginated_from_gitlab(
+            settings=settings,
+            path="/merge_requests",
+            params=params,
+        )
+    except HTTPException as error:
+        if error.status_code in {502, 504}:
+            if not settings.enable_membership_fallback:
+                _raise_global_scope_failure_with_fallback_hint(error)
+            logger.warning(
+                "Global /merge_requests query failed with %s. "
+                "Falling back to membership=true project enumeration.",
+                error.status_code,
+            )
+            return fetch_by_membership_enumeration(
+                settings=settings,
+                resource="merge_requests",
+                params=params,
+            )
+        raise

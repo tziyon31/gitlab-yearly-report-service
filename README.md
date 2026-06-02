@@ -63,9 +63,13 @@ The service is configured entirely through environment variables:
 | `GITLAB_URL`             | Yes      | —                    | Base URL of the GitLab instance, e.g. `https://gitlab.com` |
 | `GITLAB_TOKEN`           | Yes      | —                    | Personal/Project access token with **read** permissions  |
 | `REQUEST_TIMEOUT_SECONDS`| No       | `30`                 | Read timeout (seconds) for each GitLab call               |
+| `ENABLE_MEMBERSHIP_FALLBACK` | No  | `false`              | On global `502/504`, fallback to per-project enumeration over `membership=true` projects |
 
 If `GITLAB_URL` or `GITLAB_TOKEN` is missing, the service **fails fast at startup**
 with a clear error rather than crashing mid-request.
+
+When `ENABLE_MEMBERSHIP_FALLBACK=false` (default), global `scope=all` failures still
+return their error status (`502/504`) with a hint explaining how to enable fallback.
 
 ### Token permissions (read-only)
 

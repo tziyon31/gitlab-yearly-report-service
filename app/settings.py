@@ -6,11 +6,23 @@ from dataclasses import dataclass
 class Settings:
     gitlab_url: str
     gitlab_token: str
+    enable_membership_fallback: bool = False
+
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def get_settings() -> Settings:
     gitlab_url = os.environ.get("GITLAB_URL")
     gitlab_token = os.environ.get("GITLAB_TOKEN")
+    enable_membership_fallback = _env_flag(
+        "ENABLE_MEMBERSHIP_FALLBACK",
+        default=False,
+    )
 
     missing_vars = []
 
@@ -28,4 +40,5 @@ def get_settings() -> Settings:
     return Settings(
         gitlab_url=gitlab_url.rstrip("/"),
         gitlab_token=gitlab_token,
+        enable_membership_fallback=enable_membership_fallback,
     )
