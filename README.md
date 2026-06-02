@@ -103,6 +103,8 @@ The service is then available at `http://localhost:8080`.
 
 ## Run locally (without Docker)
 
+The commands below are written for **bash** (`source .venv/bin/activate`, `export`, and so on).
+
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
