@@ -10,10 +10,9 @@ Each report can be scoped to a **single project** or to the **whole GitLab insta
 (bounded by the permissions of the provided token). The service never creates,
 updates, or deletes anything in GitLab.
 
-> ### Instance-wide reporting
-> GitLab global queries with `scope=all` behave very differently on a small
-> self-hosted instance than on a large SaaS deployment.
-> **→ [Design note](#deep-dive)**
+> ### 📌 Don't miss the deep dive
+> The most interesting part of this project is the **instance-wide `scope=all`**
+> edge case. **→ [Press here to jump to the Note](#deep-dive)**
 
 ---
 
@@ -342,10 +341,10 @@ curl -i "http://localhost:8080/issues"
 
 ## Note: the instance-wide (`scope=all`) edge case
 
-The project-scoped endpoints are straightforward and reliable. The subtle part is the
-**instance-wide** report (everything visible to the token across the GitLab instance).
-This section documents what was observed on real instances and the reasoning behind
-the final design.
+The project-scoped endpoints are straightforward and reliable. The most interesting
+part of this project is the **instance-wide** report ("the entire GitLab instance,
+according to the permissions of the provided token"). I investigated it carefully, and
+this section documents what I found and the reasoning behind the final design.
 
 ### The requirement and the first approach
 
@@ -401,8 +400,8 @@ in a single response anyway).
 
 `scope=all` is the correct, literal interpretation of "the entire instance according to
 the token's permissions", and it works exactly as intended against an
-**appropriately sized instance** — for example the **local GitLab playground** below.
-On a giant public SaaS instance like GitLab.com the global
+**appropriately sized instance** — which is precisely the **local GitLab playground**
+this project documents below. On a giant public SaaS instance like GitLab.com the global
 endpoint is impractical (GitLab itself times out), so this service is intended to be
 validated instance-wide against a dedicated/self-hosted instance, while project-scoped
 reports work everywhere including GitLab.com.
